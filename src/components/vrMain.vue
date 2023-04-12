@@ -118,6 +118,8 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       });
     }
     initMarker() {
+      console.log();
+
       const markersPlugin =
         this.viewer?.getPlugin<MarkersPlugin>(MarkersPlugin);
       if (!markersPlugin || !this.vrList) return;

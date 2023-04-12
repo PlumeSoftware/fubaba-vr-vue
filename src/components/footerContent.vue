@@ -10,7 +10,7 @@
     >
       <!-- 地图按钮 -->
       <i
-        class="w-8 h-8 block cursor-pointer with-base"
+        class="w-8 h-8 cursor-pointer with-base"
         :class="{
           'with-show': !btnStatus.mapShow,
           'with-del': btnStatus.mapShow,
@@ -35,13 +35,12 @@
       </i>
     </li>
     <li
+      title="编辑/保存"
       tabindex="0"
       class="flex w-9 h-9 bg-gray-300/80 hover:bg-gray-400/80 transition-colors items-center justify-center"
     >
       <!-- 编辑按钮 -->
-      <i class="w-8 h-8 block cursor-pointer">
-        <img src="../assets/edit.svg" alt="编辑" title="编辑/保存" />
-      </i>
+      <MySvgIcon name="icon-edit" class="w-8 h-8 cursor-pointer" />
     </li>
     <li
       tabindex="0"
