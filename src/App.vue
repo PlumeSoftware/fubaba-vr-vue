@@ -5,7 +5,7 @@ onErrorCaptured((err: unknown) => {
   if (err instanceof Error) {
     if (err.message.toLocaleLowerCase().includes("net")) {
       msg.value = "网络错误";
-      return true;
+      return false;
     }
     msg.value = "未知错误";
   }

@@ -13,7 +13,6 @@ interface VrRenderControler {
   vrMap?: VrMapDetail;
   nowAt: number;
   viewer?: Viewer;
-  mode: Mode;
 }
 export type { VrRenderControler };
 export { Mode };

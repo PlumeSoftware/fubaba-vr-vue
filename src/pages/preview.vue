@@ -22,6 +22,7 @@
   </aside>
   <footer class="fixed flex bottom-0 w-full h-9">
     <FooterContent
+      @edit-click="FooterEventHander.editClick"
       @mapShowClick="FooterEventHander.mapClick"
       @fullscreen-click="FooterEventHander.fullScreenClick"
     />
@@ -65,6 +66,9 @@ const FooterEventHander = {
   },
   fullScreenClick() {
     VrMainStatus.isFullScreen = !VrMainStatus.isFullScreen;
+  },
+  editClick() {
+    VrMainStatus.mode = VrMainStatus.mode === Mode.Edit ? Mode.View : Mode.Edit;
   },
 };
 </script>

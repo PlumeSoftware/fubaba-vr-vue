@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Viewer, events } from "@photo-sphere-viewer/core";
 import "@photo-sphere-viewer/core/index.css"; //necessary
-import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import "@photo-sphere-viewer/markers-plugin/index.css"; //necessary
 import type {
   VrDetail,
@@ -10,8 +9,8 @@ import type {
   VrMapDetail,
 } from "../types/Manifestdto";
 import { Mode, type VrRenderControler } from "../types/VrRenderControler";
-import type { RadarPosition } from "../types/Postion";
-import { useDraggable } from "@vueuse/core";
+import type { Direction, RadarPosition } from "../types/Postion";
+import { SelfMarkersPlugin } from "../utils/SelfMarkerPlugin";
 
 const emit = defineEmits<{
   (e: "postionUpdate", postion: RadarPosition): void;
@@ -47,12 +46,20 @@ onMounted(async () => {
 function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
   return class RenderControler implements VrRenderControler {
     constructor() {
-      this.mode = Mode.View;
       this._nowAt = 0;
       watch(
         () => props.isFullScreen,
         () => {
           this.viewer?.enterFullscreen();
+        }
+      );
+      watch(
+        () => props.mode,
+        (newMode: Mode) => {
+          if (!this.viewer) return;
+          this.viewer
+            .getPlugin<SelfMarkersPlugin>(SelfMarkersPlugin)
+            ?.setCanDrag(newMode === Mode.Edit);
         }
       );
     }
@@ -89,7 +96,7 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
         },
         //默认首页是数据中的第一项
         panorama: URL.createObjectURL(await imgPromise),
-        plugins: [[MarkersPlugin, []]],
+        plugins: [[SelfMarkersPlugin, { canDrag: props.mode === Mode.Edit }]],
       });
 
       this.viewer.addEventListener(
@@ -102,11 +109,7 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
             y: this.vrList[this.nowAt].ypoint,
             r:
               directionMap[
-                this.vrList[this.nowAt].chaoxiang.trim() as
-                  | "东"
-                  | "南"
-                  | "西"
-                  | "北"
+                this.vrList[this.nowAt].chaoxiang.trim() as Direction
               ] + e.position.yaw, //yaw的单位是弧度
           });
         }
@@ -118,20 +121,14 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       });
     }
     initMarker() {
-      console.log();
-
-      const markersPlugin =
-        this.viewer?.getPlugin<MarkersPlugin>(MarkersPlugin);
-      if (!markersPlugin || !this.vrList) return;
-      markersPlugin.addEventListener(
-        "select-marker",
-        ({ marker, rightClick }) => {
-          console.log(marker);
-
-          if (rightClick) return;
-          this.nowAt = marker.data as number;
-        }
-      );
+      // if (!markersPlugin || !this.vrList) return;
+      // markersPlugin.addEventListener(
+      //   "select-marker",
+      //   ({ marker, rightClick }) => {
+      //     if (rightClick) return;
+      //     this.nowAt = marker.data as number;
+      //   }
+      // );
       this._loadMarkers();
     }
     renderMap(): void {
@@ -144,31 +141,34 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       emit("postionUpdate", {
         x: this.vrList[0].xpoint,
         y: this.vrList[0].ypoint,
-        r: directionMap[
-          this.vrList[0].chaoxiang.trim() as "东" | "南" | "西" | "北"
-        ],
+        r: directionMap[this.vrList[0].chaoxiang.trim() as Direction],
       });
       return;
     }
     private _loadMarkers() {
       if (!this.viewer) return;
       if (!this.vrList) return;
-      const markersPlugin =
-        this.viewer?.getPlugin<MarkersPlugin>(MarkersPlugin);
-      if (!markersPlugin) return;
-
+      const myPlugin =
+        this.viewer?.getPlugin<SelfMarkersPlugin>(SelfMarkersPlugin);
+      if (!myPlugin) return;
       this.vrList[this.nowAt].connect_position.forEach((position) => {
         const targetIdx = this.vrList!.findIndex(
           (el: VrHouseDetail) => el.vr_id === position.target
         );
-        markersPlugin.addMarker({
-          id: "" + position.target,
-          html: `<a tabindex="0" class="flex flex-col items-center text-white cursor-pointer pointer-events-auto"><img class="w-8" src="/advance.svg"/><p>${
+        // markersPlugin.addMarker({
+        //   id: "" + position.target,
+        //   html: `<a tabindex="0" class="flex flex-col items-center text-white cursor-pointer pointer-events-auto"><img class="w-8" src="/advance.svg"/><p>${
+        //     this.vrList![targetIdx].name || "未命名"
+        //   }</p></a>`,
+        //   position: position,
+        //   data: targetIdx,
+        // });
+        myPlugin.addMarker(
+          `<a tabindex="0" class="flex flex-col items-center text-white cursor-pointer pointer-events-auto"><img class="w-8" src="/advance.svg"/><p>${
             this.vrList![targetIdx].name || "未命名"
           }</p></a>`,
-          position: position,
-          data: targetIdx,
-        });
+          position
+        );
         // const targetDOM = markersPlugin.getMarker(
         //   "" + position.target
         // ).domElement;
@@ -186,10 +186,10 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       this.viewer.setPanorama(
         `https://fmj.51fubaba.com:6443/picture/vr_picture/${this.vrList[idx].picture}`
       );
-      const markersPlugin = this.viewer.getPlugin<MarkersPlugin>(MarkersPlugin);
-      markersPlugin.removeMarkers(
-        this.vrList[this._nowAt].connect_position.map((el) => "" + el.target)
-      );
+      // const markersPlugin = this.viewer.getPlugin<MarkersPlugin>(MarkersPlugin);
+      // markersPlugin.removeMarkers(
+      //   this.vrList[this._nowAt].connect_position.map((el) => "" + el.target)
+      // );
 
       this._nowAt = idx;
 
@@ -198,16 +198,13 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       emit("postionUpdate", {
         x: this.vrList[idx].xpoint,
         y: this.vrList[idx].ypoint,
-        r: directionMap[
-          this.vrList[idx].chaoxiang.trim() as "东" | "南" | "西" | "北"
-        ],
+        r: directionMap[this.vrList[idx].chaoxiang.trim() as Direction],
       });
     }
     vrList?: VrHouseDetail[];
     vrMap?: VrMapDetail;
     viewer?: Viewer;
     private _nowAt: number;
-    mode: Mode;
   };
 }
 </script>
