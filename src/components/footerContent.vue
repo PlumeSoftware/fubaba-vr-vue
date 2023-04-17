@@ -1,5 +1,5 @@
 <template>
-  <ul class="flex">
+  <ul class="flex bg-gray-300/80 rounded-r-lg">
     <li
       tabindex="0"
       title="显示/关闭户型图"
@@ -7,7 +7,7 @@
         emit('mapShowClick');
         btnStatus.mapShow = !btnStatus.mapShow;
       "
-      class="flex w-9 h-9 bg-gray-300/80 hover:bg-gray-400/80 transition-colors items-center justify-center"
+      class="flex w-9 h-9 hover:bg-gray-400/80 transition-colors items-center justify-center"
     >
       <!-- 地图按钮 -->
       <i
@@ -41,7 +41,7 @@
         emit('editClick');
         btnStatus.penShow = !btnStatus.penShow;
       "
-      class="flex w-9 h-9 bg-gray-300/80 hover:bg-gray-400/80 transition-colors items-center justify-center"
+      class="flex w-9 h-9 hover:bg-gray-400/80 transition-colors items-center justify-center"
     >
       <!-- 编辑按钮 -->
       <i
@@ -76,14 +76,14 @@
       tabindex="0"
       title="全屏模式"
       @click="emit('fullscreenClick')"
-      class="flex w-9 h-9 bg-gray-300/80 hover:bg-gray-400/80 transition-colors items-center justify-center"
+      class="flex w-9 h-9 hover:bg-gray-400/80 transition-colors items-center justify-center"
     >
       <MySvgIcon name="icon-fullscreen" class="w-8 h-8 cursor-pointer" />
     </li>
     <li
       tabindex="0"
       title="房间列表"
-      class="flex w-9 h-9 bg-gray-300/80 hover:bg-gray-400/80 transition-colors items-center justify-center"
+      class="flex w-9 h-9 hover:bg-gray-400/80 transition-colors items-center justify-center"
     >
       <!-- 所有房间 -->
       <MySvgIcon name="icon-menu" class="w-8 h-8 cursor-pointer" />

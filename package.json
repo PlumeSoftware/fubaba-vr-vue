@@ -11,7 +11,7 @@
   "dependencies": {
     "@photo-sphere-viewer/core": "^5.1.4",
     "@photo-sphere-viewer/markers-plugin": "^5.1.4",
-    "@vueuse/core": "^9.13.0",
+    "@vueuse/core": "^10.0.2",
     "vue": "^3.2.47"
   },
   "devDependencies": {

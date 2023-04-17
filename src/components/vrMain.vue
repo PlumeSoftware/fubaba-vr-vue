@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Viewer, events } from "@photo-sphere-viewer/core";
 import "@photo-sphere-viewer/core/index.css"; //necessary
-import "@photo-sphere-viewer/markers-plugin/index.css"; //necessary
 import type {
   VrDetail,
   VrHouseDetail,
@@ -10,7 +9,12 @@ import type {
 } from "../types/Manifestdto";
 import { Mode, type VrRenderControler } from "../types/VrRenderControler";
 import type { Direction, RadarPosition } from "../types/Postion";
-import { SelfMarkersPlugin } from "../utils/SelfMarkerPlugin";
+import {
+  SelfMarkersPlugin,
+  SelfMarkersPluginClick,
+  SelfMarkersPluginTouchEnd,
+  SelfMarkersPluginTouchMove,
+} from "../utils/SelfMarkerPlugin";
 
 const emit = defineEmits<{
   (e: "postionUpdate", postion: RadarPosition): void;
@@ -29,6 +33,15 @@ const directionMap = {
 
 const REQID = 20181501603;
 const vrContainer = ref<HTMLElement>();
+const trashState = reactive<{
+  container: HTMLElement | null;
+  show: boolean;
+  direction: "none" | "left" | "right";
+}>({
+  container: null,
+  show: false,
+  direction: "none",
+});
 const vrManifestJsonPromise = fetch(
   `https://mobile.51fubaba.cn:8443/dl-weapp/api/ershoufang/vr/get/${REQID}/`
 ).then((res: Response) => res.json() as Promise<VrManifestJSON>);
@@ -80,6 +93,7 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       });
     }
     async initVrViewer(): Promise<void> {
+      //promise 用于等待viewer初始化完成
       if (!vrContainer.value) return;
       if (!this.vrList) return;
       //因为这个库的问题,会请求两次图片,这里先帮他请求好,缓存起来
@@ -121,14 +135,61 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       });
     }
     initMarker() {
-      // if (!markersPlugin || !this.vrList) return;
-      // markersPlugin.addEventListener(
-      //   "select-marker",
-      //   ({ marker, rightClick }) => {
-      //     if (rightClick) return;
-      //     this.nowAt = marker.data as number;
-      //   }
-      // );
+      const myPlugin =
+        this.viewer?.getPlugin<SelfMarkersPlugin>(SelfMarkersPlugin);
+      if (!myPlugin || !this.vrList) return;
+      const onMarkerClick = (e: SelfMarkersPluginClick) => {
+        if (props.mode === Mode.Edit) return;
+        this.viewer?.stopAnimation();
+        this.nowAt = e.metaData as number;
+      };
+      myPlugin.addEventListener("markerClick", onMarkerClick);
+      myPlugin.addEventListener("markerTouchStart", () => {
+        //显示垃圾桶
+        trashState.show = true;
+      });
+      myPlugin.addEventListener(
+        "markerTouchMove",
+        (e: SelfMarkersPluginTouchMove) => {
+          //判断垃圾桶的方向
+          if (!this._aMidInB(e.marker, trashState.container!))
+            return void (trashState.direction = "none");
+          trashState.direction = this._aRelativeB(
+            e.marker,
+            trashState.container!
+          );
+        }
+      );
+      myPlugin.addEventListener(
+        "markerTouchEnd",
+        (e: SelfMarkersPluginTouchEnd) => {
+          //判断是否删除
+          if (this._aMidInB(e.marker, trashState.container!)) {
+            //如果在垃圾桶里面,就删除
+            myPlugin.removeMarker(e.marker, {
+              animate: true,
+              animateName: "marker-out", //这个动画写在下面,也可以自己写动画
+              onAnimateEnd: async () => {
+                //删除后,把垃圾桶隐藏
+                trashState.show = false;
+                trashState.direction = "none";
+                //删除后,把数据中的这个房源删除
+                this.vrList!.splice(
+                  this.vrList![this._nowAt].connect_position.findIndex(
+                    (hotPoint) => e.metaData === hotPoint.target
+                  ),
+                  1
+                );
+                await this._updateConnectPosition();
+              },
+            });
+          } else {
+            //如果不在垃圾桶里面,就不删除,只隐藏垃圾桶
+            trashState.show = false;
+            trashState.direction = "none";
+          }
+        }
+      );
       this._loadMarkers();
     }
     renderMap(): void {
@@ -155,26 +216,49 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
         const targetIdx = this.vrList!.findIndex(
           (el: VrHouseDetail) => el.vr_id === position.target
         );
-        // markersPlugin.addMarker({
-        //   id: "" + position.target,
-        //   html: `<a tabindex="0" class="flex flex-col items-center text-white cursor-pointer pointer-events-auto"><img class="w-8" src="/advance.svg"/><p>${
-        //     this.vrList![targetIdx].name || "未命名"
-        //   }</p></a>`,
-        //   position: position,
-        //   data: targetIdx,
-        // });
         myPlugin.addMarker(
           `<a tabindex="0" class="flex flex-col items-center text-white cursor-pointer pointer-events-auto"><img class="w-8" src="/advance.svg"/><p>${
             this.vrList![targetIdx].name || "未命名"
           }</p></a>`,
-          position
+          { position, metaData: targetIdx }
         );
-        // const targetDOM = markersPlugin.getMarker(
-        //   "" + position.target
-        // ).domElement;
-        // targetDOM.style.position = "fixed";
-        // useDraggable(targetDOM);
       });
+    }
+    private _fromIdToindex(id: number): number {
+      if (!this.vrList) return -1;
+      return this.vrList.findIndex((el) => el.vr_id === id);
+    }
+    private async _updateConnectPosition() {
+      const formData = new URLSearchParams();
+      formData.append("vr_id", this.vrList![this.nowAt].vr_id.toString());
+      formData.append(
+        "connect_position",
+        JSON.stringify(this.vrList![this.nowAt].connect_position)
+      );
+    }
+    _aMidInB(a: HTMLElement, b: HTMLElement): boolean {
+      //判断a的中心是否在b中
+      const aPos = a.getBoundingClientRect();
+      const bPos = b.getBoundingClientRect();
+      const aMiddleX = aPos.left + aPos.width / 2;
+      const aMiddleY = aPos.top + aPos.height / 2;
+      if (
+        aMiddleX >= bPos.left &&
+        aMiddleX <= bPos.left + bPos.width &&
+        aMiddleY >= bPos.top &&
+        aMiddleY <= bPos.top + bPos.height
+      )
+        return true;
+      return false;
+    }
+    _aRelativeB(a: HTMLElement, b: HTMLElement): "right" | "left" {
+      //判断a相对于b的位置
+      const aPos = a.getBoundingClientRect();
+      const bPos = b.getBoundingClientRect();
+      const aMiddleX = aPos.left + aPos.width / 2;
+      const bMiddleX = bPos.left + bPos.width / 2;
+      if (aMiddleX <= bMiddleX) return "left";
+      return "right";
     }
     get nowAt(): number {
       return this._nowAt;
@@ -186,10 +270,9 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       this.viewer.setPanorama(
         `https://fmj.51fubaba.com:6443/picture/vr_picture/${this.vrList[idx].picture}`
       );
-      // const markersPlugin = this.viewer.getPlugin<MarkersPlugin>(MarkersPlugin);
-      // markersPlugin.removeMarkers(
-      //   this.vrList[this._nowAt].connect_position.map((el) => "" + el.target)
-      // );
+      const myPlugin =
+        this.viewer.getPlugin<SelfMarkersPlugin>(SelfMarkersPlugin);
+      myPlugin.removeAllMarker();
 
       this._nowAt = idx;
 
@@ -211,10 +294,45 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
 
 <template>
   <div ref="vrContainer" />
+  <!-- 垃圾桶图标 -->
+  <Transition name="slide-fade">
+    <footer
+      :ref="(el:HTMLElement) => void (trashState.container = el)"
+      v-show="trashState.show"
+      class="flex fixed right-0 md:left-1/2 md:-translate-x-1/2 bottom-0 h-20 w-20 items-top justify-center"
+    >
+      <i
+        class="w-20 h-16 mt-2 translate-y-1/2 bg-gray-300/80 shadow-md shadow-gray-300/80 rounded-l-lg md:rounded-xl"
+      >
+        <TrashIcon
+          class="w-10 h-10 m-auto"
+          :direaticon="trashState.direction"
+        />
+      </i>
+    </footer>
+  </Transition>
 </template>
 
 <style scoped>
 :deep(.psv-markers) {
   pointer-events: none;
+}
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.slide-fade-leave-active {
+  transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateY(1rem);
+  opacity: 0;
+}
+:deep(.marker-out) {
+  /* marker的删除动画 */
+  transition: transform 0.3s ease-out;
+  transform: scale(0);
 }
 </style>

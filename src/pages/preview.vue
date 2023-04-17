@@ -20,7 +20,7 @@
       :show="VrMapStatus.show"
     />
   </aside>
-  <footer class="fixed flex bottom-0 w-full h-9">
+  <footer class="fixed flex bottom-0 w-full h-9 z-30">
     <FooterContent
       @edit-click="FooterEventHander.editClick"
       @mapShowClick="FooterEventHander.mapClick"

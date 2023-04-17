@@ -1,5 +1,9 @@
 export {};
-import { useDebounceFn, useDraggable, useThrottleFn } from "@vueuse/core";
+import {
+  useDraggable,
+  useThrottleFn,
+  type Position as MovePosition,
+} from "@vueuse/core";
 import {
   AbstractPlugin,
   Viewer,
@@ -16,6 +20,10 @@ type Size = {
 type SelfConfig = {
   canDrag: boolean;
 };
+type MarkerInfo = {
+  position: ConnectPosition;
+  metaData: unknown;
+};
 type MarkerState = {
   width: number;
   height: number;
@@ -23,32 +31,59 @@ type MarkerState = {
   isDragging: Ref<boolean>;
   stop: WatchStopHandle;
 };
+type RemoveMarkerConfig = {
+  animate: boolean;
+  animateName: string;
+  onAnimateEnd: () => void;
+};
 export class SelfMarkersPluginClick extends TypedEvent<SelfMarkersPlugin> {
   static override readonly type = "markerClick";
-  constructor() {
+  type: "markerClick" = "markerClick";
+  originEvent: MouseEvent;
+  metaData: unknown;
+  constructor(e: MouseEvent, metaData?: unknown) {
     super(SelfMarkersPluginClick.type);
+    this.originEvent = e;
+    this.metaData = metaData;
   }
 }
 export class SelfMarkersPluginTouchStart extends TypedEvent<SelfMarkersPlugin> {
   static override readonly type = "markerTouchStart";
-  constructor() {
-    super(SelfMarkersPluginClick.type);
+  type: "markerTouchStart" = "markerTouchStart";
+  marker: HTMLElement;
+  metaData: unknown;
+  constructor(mk: HTMLElement, metaData: unknown) {
+    super(SelfMarkersPluginTouchStart.type);
+    this.marker = mk;
+    this.metaData = metaData;
   }
 }
 export class SelfMarkersPluginTouchEnd extends TypedEvent<SelfMarkersPlugin> {
   static override readonly type = "markerTouchEnd";
-  constructor() {
-    super(SelfMarkersPluginClick.type);
+  type: "markerTouchEnd" = "markerTouchEnd";
+  marker: HTMLElement;
+  metaData: unknown;
+  constructor(mk: HTMLElement, metaData: unknown) {
+    super(SelfMarkersPluginTouchEnd.type);
+    this.marker = mk;
+    this.metaData = metaData;
   }
 }
 export class SelfMarkersPluginTouchMove extends TypedEvent<SelfMarkersPlugin> {
   static override readonly type = "markerTouchMove";
-  constructor() {
-    super(SelfMarkersPluginClick.type);
+  type: "markerTouchMove" = "markerTouchMove";
+  position: MovePosition;
+  marker: HTMLElement;
+  metaData: unknown;
+  constructor(p: MovePosition, marker: HTMLElement, metaData: unknown) {
+    super(SelfMarkersPluginTouchMove.type);
+    this.marker = marker;
+    this.position = p;
+    this.metaData = metaData;
   }
 }
 export class SelfMarkersPlugin extends AbstractPlugin<
-  | SelfMarkersPluginTouchStart
+  | SelfMarkersPluginClick
   | SelfMarkersPluginTouchStart
   | SelfMarkersPluginTouchEnd
   | SelfMarkersPluginTouchMove
@@ -63,7 +98,8 @@ export class SelfMarkersPlugin extends AbstractPlugin<
     this.option = options;
     this.markersCollection = new Map();
     this.markersHost = document.createElement("div");
-    this.markersHost.className = "self-mp-host absolute w-full h-full";
+    this.markersHost.className =
+      "self-mp-host absolute w-full h-full touch-none";
     this.viewer.container.appendChild(this.markersHost);
   }
   override init() {
@@ -85,16 +121,18 @@ export class SelfMarkersPlugin extends AbstractPlugin<
       });
     });
   }
-  setCanDrag(canDrag: boolean) {
+  public setCanDrag(canDrag: boolean) {
     this.option.canDrag = canDrag;
   }
-  addMarker(html: string | HTMLElement, position: ConnectPosition) {
+  public addMarker(html: string | HTMLElement, info: MarkerInfo) {
     const markerHost = document.createElement("div");
-    markerHost.className = "absolute";
+    markerHost.className = "absolute invisible z-10";
     typeof html === "string"
       ? (markerHost.innerHTML = html)
       : markerHost.appendChild(html);
-
+    markerHost.addEventListener("click", (e) =>
+      this.dispatchEvent(new SelfMarkersPluginClick(e, info.metaData))
+    );
     this.markersHost!.appendChild(markerHost);
     const size = markerHost.getBoundingClientRect();
     const debouncedAutoRotate = useThrottleFn((position: Position) => {
@@ -109,9 +147,14 @@ export class SelfMarkersPlugin extends AbstractPlugin<
       onStart: () => {
         //如果外层设置了不能拖动，就禁止marker的拖动
         if (!this.option.canDrag) return false;
-        this.dispatchEvent(new SelfMarkersPluginTouchStart());
+        this.dispatchEvent(
+          new SelfMarkersPluginTouchStart(markerHost, info.metaData)
+        );
       },
-      onMove: () => {
+      onMove: (p) => {
+        this.dispatchEvent(
+          new SelfMarkersPluginTouchMove(p, markerHost, info.metaData)
+        );
         const position = this.__computeMarkerPosition(x.value, y.value);
         this.markersCollection.get(markerHost)!.v3d =
           this.viewer.dataHelper.sphericalCoordsToVector3(position);
@@ -120,13 +163,15 @@ export class SelfMarkersPlugin extends AbstractPlugin<
         }
       },
       onEnd: () => {
-        this.dispatchEvent(new SelfMarkersPluginTouchEnd());
+        this.dispatchEvent(
+          new SelfMarkersPluginTouchEnd(markerHost, info.metaData)
+        );
       },
     });
     this.markersCollection.set(markerHost, {
       width: size.width,
       height: size.height,
-      v3d: this.viewer.dataHelper.sphericalCoordsToVector3(position),
+      v3d: this.viewer.dataHelper.sphericalCoordsToVector3(info.position),
       isDragging,
       stop: watch(
         () => style.value,
@@ -139,7 +184,29 @@ export class SelfMarkersPlugin extends AbstractPlugin<
 
     this.__setMarkerVisible(markerHost);
   }
-  __isMarkerVisible(markerHost: HTMLElement) {
+  public removeAllMarker() {
+    this.markersCollection.forEach((state, markerHost) => {
+      state.stop();
+      this.markersHost!.removeChild(markerHost);
+    });
+    this.markersCollection.clear();
+  }
+  public removeMarker(who: HTMLElement, config: RemoveMarkerConfig) {
+    if (config.animate) {
+      who.classList.add(config.animateName);
+      who.addEventListener("transitionend", () => {
+        config.onAnimateEnd();
+        this.markersHost?.removeChild(who);
+        this.markersCollection.get(who)?.stop();
+        this.markersCollection.delete(who);
+      });
+    } else {
+      this.markersHost?.removeChild(who);
+      this.markersCollection.get(who)?.stop();
+      this.markersCollection.delete(who);
+    }
+  }
+  private __isMarkerVisible(markerHost: HTMLElement) {
     const markersize = this.markersCollection.get(markerHost) as Size;
     const v3d = this.viewer.dataHelper.vector3ToViewerCoords(markersize.v3d);
 
@@ -151,7 +218,7 @@ export class SelfMarkersPlugin extends AbstractPlugin<
       v3d.y - markersize.height <= this.viewer.state.size.height
     );
   }
-  __setMarkerVisible(markerHost: HTMLElement) {
+  private __setMarkerVisible(markerHost: HTMLElement) {
     if (this.__isMarkerVisible(markerHost)) {
       markerHost.classList.remove("invisible");
       markerHost.classList.add("visible");
@@ -160,7 +227,7 @@ export class SelfMarkersPlugin extends AbstractPlugin<
       markerHost.classList.add("invisible");
     }
   }
-  __isEngageEdge(
+  private __isEngageEdge(
     x: number,
     y: number,
     markerSize: { width: number; height: number }
@@ -168,11 +235,11 @@ export class SelfMarkersPlugin extends AbstractPlugin<
     return (
       x < 0 ||
       y < 0 ||
-      x + markerSize.width + 3 > this.viewer.state.size.width ||
-      y + markerSize.height > this.viewer.state.size.height
+      x + markerSize.width / 2 > this.viewer.state.size.width ||
+      y + markerSize.height / 2 > this.viewer.state.size.height
     );
   }
-  __computeMarkerPosition(x: number, y: number): Position {
+  private __computeMarkerPosition(x: number, y: number): Position {
     const intersection = this.viewer.renderer
       .getIntersections({ x, y })
       .find((i) => i.object.userData["photoSphereViewer"]);
