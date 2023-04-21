@@ -62,11 +62,13 @@ export class SelfMarkersPluginTouchEnd extends TypedEvent<SelfMarkersPlugin> {
   static override readonly type = "markerTouchEnd";
   type: "markerTouchEnd" = "markerTouchEnd";
   marker: HTMLElement;
+  position: Position;
   metaData: unknown;
-  constructor(mk: HTMLElement, metaData: unknown) {
+  constructor(mk: HTMLElement, metaData: unknown, position: Position) {
     super(SelfMarkersPluginTouchEnd.type);
     this.marker = mk;
     this.metaData = metaData;
+    this.position = position;
   }
 }
 export class SelfMarkersPluginTouchMove extends TypedEvent<SelfMarkersPlugin> {
@@ -155,6 +157,7 @@ export class SelfMarkersPlugin extends AbstractPlugin<
         this.dispatchEvent(
           new SelfMarkersPluginTouchMove(p, markerHost, info.metaData)
         );
+        //拖动到边缘时，自动旋转
         const position = this.__computeMarkerPosition(x.value, y.value);
         this.markersCollection.get(markerHost)!.v3d =
           this.viewer.dataHelper.sphericalCoordsToVector3(position);
@@ -163,8 +166,9 @@ export class SelfMarkersPlugin extends AbstractPlugin<
         }
       },
       onEnd: () => {
+        const position = this.__computeMarkerPosition(x.value, y.value);
         this.dispatchEvent(
-          new SelfMarkersPluginTouchEnd(markerHost, info.metaData)
+          new SelfMarkersPluginTouchEnd(markerHost, info.metaData, position)
         );
       },
     });

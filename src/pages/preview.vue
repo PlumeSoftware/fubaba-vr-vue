@@ -7,6 +7,7 @@
       :mode="VrMainStatus.mode"
       @mapGot="VrMainEventHander.mapGot($event)"
       @postionUpdate="VrMainEventHander.postionUpdate($event)"
+      @updateLoading="FooterContentStatus.updateLoading = $event"
     />
   </main>
   <!-- VrMap的高度没有由外层元素控制,而是由其图片的高度定义,因为pages只负责布局,而无实际功能 -->
@@ -22,6 +23,8 @@
   </aside>
   <footer class="fixed flex bottom-0 w-full h-9 z-30">
     <FooterContent
+      :menu-cross-show="VrMainStatus.mode === Mode.Edit"
+      :update-loading="FooterContentStatus.updateLoading"
       @edit-click="FooterEventHander.editClick"
       @mapShowClick="FooterEventHander.mapClick"
       @fullscreen-click="FooterEventHander.fullScreenClick"
@@ -49,7 +52,9 @@ const VrMapStatus = reactive<{
   position: { x: 0, y: 0, r: 0 },
   show: false,
 });
-
+const FooterContentStatus = reactive({
+  updateLoading: false,
+});
 const VrMainEventHander = {
   mapGot(src: string) {
     VrMapStatus.src = src;

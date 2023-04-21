@@ -19,6 +19,7 @@ import {
 const emit = defineEmits<{
   (e: "postionUpdate", postion: RadarPosition): void;
   (e: "mapGot", src: string): void;
+  (e: "updateLoading", loading: boolean): void;
 }>();
 const props = defineProps<{
   isFullScreen: boolean;
@@ -60,6 +61,7 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
   return class RenderControler implements VrRenderControler {
     constructor() {
       this._nowAt = 0;
+      this._vrListCommitable = false;
       watch(
         () => props.isFullScreen,
         () => {
@@ -73,6 +75,9 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
           this.viewer
             .getPlugin<SelfMarkersPlugin>(SelfMarkersPlugin)
             ?.setCanDrag(newMode === Mode.Edit);
+          if (newMode === Mode.View && this._vrListCommitable) {
+            this._updateConnectPosition();
+          }
         }
       );
     }
@@ -169,25 +174,39 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
             myPlugin.removeMarker(e.marker, {
               animate: true,
               animateName: "marker-out", //这个动画写在下面,也可以自己写动画
-              onAnimateEnd: async () => {
+              onAnimateEnd: () => {
                 //删除后,把垃圾桶隐藏
                 trashState.show = false;
                 trashState.direction = "none";
                 //删除后,把数据中的这个房源删除
-                this.vrList!.splice(
-                  this.vrList![this._nowAt].connect_position.findIndex(
-                    (hotPoint) => e.metaData === hotPoint.target
-                  ),
-                  1
+                const delIndex = this.vrList![
+                  this._nowAt
+                ].connect_position.findIndex(
+                  (connet) =>
+                    connet.target === this.vrList![<number>e.metaData].vr_id
                 );
-                await this._updateConnectPosition();
+                this.vrList![this._nowAt].connect_position.splice(delIndex, 1);
               },
             });
           } else {
             //如果不在垃圾桶里面,就不删除,只隐藏垃圾桶
             trashState.show = false;
             trashState.direction = "none";
+
+            const targetIdx = this.vrList![
+              this._nowAt
+            ].connect_position.findIndex(
+              (hotPoint) =>
+                this.vrList![<number>e.metaData].vr_id === hotPoint.target
+            );
+            if (targetIdx === -1) return;
+            this.vrList![this._nowAt].connect_position[targetIdx].pitch =
+              e.position.pitch;
+            this.vrList![this._nowAt].connect_position[targetIdx].yaw =
+              e.position.yaw;
           }
+          //只要拖拽了marker,就认为marker的信息有所改变
+          this._vrListCommitable = true;
         }
       );
       this._loadMarkers();
@@ -224,17 +243,25 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
         );
       });
     }
-    private _fromIdToindex(id: number): number {
-      if (!this.vrList) return -1;
-      return this.vrList.findIndex((el) => el.vr_id === id);
-    }
-    private async _updateConnectPosition() {
+    private _updateConnectPosition() {
       const formData = new URLSearchParams();
       formData.append("vr_id", this.vrList![this.nowAt].vr_id.toString());
       formData.append(
         "connect_position",
         JSON.stringify(this.vrList![this.nowAt].connect_position)
       );
+      emit("updateLoading", true);
+      return fetch("https://mobile.51fubaba.cn:8443/dl-weapp/api/vr/update", {
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        method: "POST",
+        body: formData,
+      }).then((res) => {
+        this._vrListCommitable = false;
+        emit("updateLoading", false);
+        return res;
+      });
     }
     _aMidInB(a: HTMLElement, b: HTMLElement): boolean {
       //判断a的中心是否在b中
@@ -266,7 +293,6 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
     set nowAt(idx: number) {
       if (!this.vrList) return;
       if (!this.viewer) return;
-
       this.viewer.setPanorama(
         `https://fmj.51fubaba.com:6443/picture/vr_picture/${this.vrList[idx].picture}`
       );
@@ -285,6 +311,7 @@ function ControlerFactory(vrManifestJsonPromise: Promise<VrManifestJSON>) {
       });
     }
     vrList?: VrHouseDetail[];
+    _vrListCommitable: boolean; //是否允许提交更改,主要是为了减少多次上传相同的位置
     vrMap?: VrMapDetail;
     viewer?: Viewer;
     private _nowAt: number;

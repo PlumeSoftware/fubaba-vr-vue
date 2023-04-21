@@ -2,7 +2,7 @@
   <ul class="flex bg-gray-300/80 rounded-r-lg">
     <li
       tabindex="0"
-      title="显示/关闭户型图"
+      :title="btnStatus.mapShow ? '隐藏户型图' : '显示户型图'"
       @click="
         emit('mapShowClick');
         btnStatus.mapShow = !btnStatus.mapShow;
@@ -35,7 +35,7 @@
       </i>
     </li>
     <li
-      title="编辑/保存"
+      :title="btnStatus.penShow ? '编辑指引' : '保存更改'"
       tabindex="0"
       @click="
         emit('editClick');
@@ -49,6 +49,7 @@
         :class="{
           'with-show-check': !btnStatus.penShow,
           'with-show-pen': btnStatus.penShow,
+          'with-outline-loading': props.updateLoading,
         }"
         id="edit"
       >
@@ -82,21 +83,29 @@
     </li>
     <li
       tabindex="0"
-      title="房间列表"
+      :title="props.menuCrossShow ? '添加指引' : '房间列表'"
       class="flex w-9 h-9 hover:bg-gray-400/80 transition-colors items-center justify-center"
     >
       <!-- 所有房间 -->
-      <MySvgIcon name="icon-menu" class="w-8 h-8 cursor-pointer" />
+      <MenuCrossIcon
+        :crossShow="props.menuCrossShow"
+        class="w-8 h-8 cursor-pointer"
+      />
     </li>
   </ul>
 </template>
 
 <script setup lang="ts">
 import MySvgIcon from "~virtual/svg-component";
+import MenuCrossIcon from "./svgComponents/MenuCrossIcon.vue";
 const emit = defineEmits<{
   (e: "mapShowClick"): void;
   (e: "editClick"): void;
   (e: "fullscreenClick"): void;
+}>();
+const props = defineProps<{
+  updateLoading: boolean;
+  menuCrossShow: boolean;
 }>();
 const btnStatus = reactive({
   mapShow: true,
@@ -143,5 +152,19 @@ ul > li:last-child {
 }
 .with-show-check > svg path.p-pen {
   opacity: 0;
+}
+@keyframes outline-loading {
+  0%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dashoffset: 41;
+  }
+}
+
+.with-outline-loading > svg path.p-outline {
+  stroke-dasharray: 41;
+  animation: outline-loading 0.3s ease infinite;
 }
 </style>
