@@ -1,5 +1,5 @@
 <template>
-  <ul class="flex bg-gray-300/80 rounded-r-lg">
+  <ul class="flex bg-gray-300/80 rounded-r-lg tool-bar">
     <li
       tabindex="0"
       :title="btnStatus.mapShow ? '隐藏户型图' : '显示户型图'"
@@ -83,6 +83,7 @@
     </li>
     <li
       tabindex="0"
+      @click="btnStatus.modalShow = true"
       :title="props.menuCrossShow ? '添加指引' : '房间列表'"
       class="flex w-9 h-9 hover:bg-gray-400/80 transition-colors items-center justify-center"
     >
@@ -91,25 +92,63 @@
         :crossShow="props.menuCrossShow"
         class="w-8 h-8 cursor-pointer"
       />
+      <MyModal :show="btnStatus.modalShow" @close="btnStatus.modalShow = false">
+        <div class="rounded-lg bg-slate-300">
+          <header
+            class="md:space-y-2 px-3 md:px-5 py-2 md:py-4 rounded-t-lg text-gray-900"
+          >
+            <h2 class="font-semibold">
+              {{ btnStatus.penShow ? "跳转至" : "新建指引" }}
+            </h2>
+            <p
+              class="text-xs text-gray-600"
+              v-if="props.vrList && Number.isInteger(props.vrIndex)"
+            >
+              您目前在<b>{{ props.vrList[props.vrIndex!].name }}</b>
+            </p>
+          </header>
+          <ul
+            class="grid gap-2 md:gap-5 grid-cols-1 md:grid-cols-2 rounded-b-lg px-3 md:px-5 py-2 md:py-4 bg-slate-400"
+          >
+            <li
+              v-for="(vr, index) in props.vrList"
+              :key="vr.vr_id"
+              @pointerup="
+                emit('menuClick', index);
+                btnStatus.modalShow = false;
+              "
+              class="flex justify-center hover:bg-slate-300 hover:scale-110 px-2 py-2 border ring-slate-300 space-x-2 rounded-lg transition-all"
+            >
+              <button>{{ vr.name }}</button>
+            </li>
+          </ul>
+        </div>
+      </MyModal>
     </li>
   </ul>
 </template>
 
 <script setup lang="ts">
 import MySvgIcon from "~virtual/svg-component";
+import type { VrHouseDetail } from "../types/Manifestdto";
+import MyModal from "./myModal.vue";
 import MenuCrossIcon from "./svgComponents/MenuCrossIcon.vue";
 const emit = defineEmits<{
   (e: "mapShowClick"): void;
   (e: "editClick"): void;
   (e: "fullscreenClick"): void;
+  (e: "menuClick", index: number): void;
 }>();
 const props = defineProps<{
   updateLoading: boolean;
   menuCrossShow: boolean;
+  vrList?: VrHouseDetail[];
+  vrIndex?: number;
 }>();
 const btnStatus = reactive({
   mapShow: true,
   penShow: true,
+  modalShow: false,
 });
 </script>
 
@@ -118,7 +157,7 @@ const btnStatus = reactive({
 	* This code is used to make the last item in a list have rounded corners
 	* on the bottom right and top right. 
 */
-ul > li:last-child {
+.tool-bar > li:last-child {
   border-top-right-radius: 0.5rem;
   border-bottom-right-radius: 0.5rem;
 }

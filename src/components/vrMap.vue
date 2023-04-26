@@ -2,7 +2,7 @@
 import type { RadarPosition } from "../types/Postion";
 
 const props = defineProps<{
-  src?: string;
+  mapSrc?: string;
   show: boolean;
   position: RadarPosition;
 }>();
@@ -105,15 +105,15 @@ function pointerAutoMove() {
     <div
       tabindex="1"
       ref="mapHost"
-      v-show="props.src && props.show"
+      v-show="props.mapSrc && props.show"
       class="w-1/4 relative transition-transform cursor-zoom-in"
       :style="mapZoomCss[mapZoomCss.zoomStatus]"
       @click="onMapHostClick"
     >
       <img
         :src="
-          props.src
-            ? `https://fmj.51fubaba.com:6443/picture/vr_picture/${props.src}`
+          props.mapSrc
+            ? `https://fmj.51fubaba.com:6443/picture/vr_picture/${props.mapSrc}`
             : void 0
         "
         alt="户型图"
