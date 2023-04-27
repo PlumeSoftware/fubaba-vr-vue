@@ -142,7 +142,7 @@ const emit = defineEmits<{
 const props = defineProps<{
   updateLoading: boolean;
   menuCrossShow: boolean;
-  vrList?: VrHouseDetail[];
+  vrList: VrHouseDetail[] | null;
   vrIndex?: number;
 }>();
 const btnStatus = reactive({

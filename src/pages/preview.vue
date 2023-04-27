@@ -59,7 +59,7 @@ const VrMainEventHander = {
     vrTotal.index = targetIdx;
   },
   connectPositionUpdate(newList: ConnectPosition[]) {
-    vrTotal.vrList[vrTotal.index].connect_position = newList;
+    vrTotal.vrList![vrTotal.index].connect_position = newList;
   },
 };
 const FooterEventHander = {
@@ -75,14 +75,20 @@ const FooterEventHander = {
   menuClick(index: number) {
     if (vrTotal.mode === Mode.View) vrTotal.index = index;
     else {
+      vrTotal.vrList![vrTotal.index].connect_position.push({
+        autoGen: true,
+        target: vrTotal.vrList![vrTotal.index].vr_id,
+        yaw: 0,
+        pitch: 0,
+      });
     }
   },
 };
 
 const REQID = 20181501603;
 const vrTotal = reactive({
-  vrList: [] as VrHouseDetail[],
-  vrMap: {} as VrMapDetail,
+  vrList: null as VrHouseDetail[] | null,
+  vrMap: null as VrMapDetail | null,
   mapShow: true,
   index: 0 as number,
   position: { x: 0, y: 0, r: 0 } as { x: number; y: number; r: number },
@@ -94,13 +100,13 @@ const VrMainStatus = computed(() => {
   return {
     isFullScreen: vrTotal.fullScreen,
     mode: vrTotal.mode,
-    whichVr: vrTotal.vrList[vrTotal.index],
+    whichVr: vrTotal.vrList && vrTotal.vrList[vrTotal.index],
     vrList: vrTotal.vrList,
   };
 });
 const VrMapStatus = computed(() => {
   return {
-    src: vrTotal.vrMap.picture,
+    src: vrTotal.vrMap?.picture,
     position: vrTotal.position,
     show: vrTotal.mapShow,
   };

@@ -44,11 +44,11 @@ document.body.addEventListener("pointerup", (e) => {
 <style scoped>
 .modal-mask-enter-active,
 .modal-mask-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.4s ease;
 }
 .modal-mask-enter-active .modal-content,
 .modal-mask-leave-active .modal-content {
-  transition: all 0.3s ease;
+  transition: all 0.4s ease;
 }
 .modal-mask-enter-from,
 .modal-mask-leave-to {

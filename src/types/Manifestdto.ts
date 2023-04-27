@@ -37,6 +37,7 @@ type ConnectPosition = {
   pitch: number;
   target: number;
   yaw: number;
+  autoGen?: boolean;
 };
 export type {
   VrManifestJSON,

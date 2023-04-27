@@ -22,8 +22,8 @@ const emit = defineEmits<{
 const props = defineProps<{
   isFullScreen: boolean;
   mode: Mode;
-  whichVr: VrHouseDetail;
-  vrList: VrHouseDetail[];
+  whichVr: VrHouseDetail | null;
+  vrList: VrHouseDetail[] | null;
 }>();
 const directionMap = {
   东: (90 / 180) * Math.PI,
@@ -68,7 +68,7 @@ onMounted(async () => {
       function reloadPanorame(newVr) {
         if (!newVr) return;
         viewer.setPanorama(
-          `https://fmj.51fubaba.com:6443/picture/vr_picture/${props.whichVr.picture}`
+          `https://fmj.51fubaba.com:6443/picture/vr_picture/${newVr.picture}`
         );
 
         emit("postionUpdate", {
@@ -142,14 +142,13 @@ onMounted(async () => {
               trashState.show = false;
               trashState.direction = "none";
               //删除后,把数据中的这个房源删除
-              const delIndex = props.whichVr.connect_position.findIndex(
-                (connet) => connet.target === props.whichVr.vr_id
+              const comitList = Array.from(props.whichVr.connect_position);
+              const delIdx = comitList.findIndex(
+                (cp) => cp.target === props.vrList![<number>e.metaData].vr_id
               );
-
-              emit(
-                "connectPositionUpdate",
-                Array.from(props.whichVr.connect_position).splice(delIndex, 1)
-              );
+              if (delIdx === -1) return;
+              comitList.splice(delIdx, 1);
+              emit("connectPositionUpdate", comitList);
             },
           });
         } else {
@@ -159,7 +158,7 @@ onMounted(async () => {
 
           const comitList = Array.from(props.whichVr.connect_position);
           const targetIdx = comitList.findIndex(
-            (hotPoint) => props.whichVr!.vr_id === hotPoint.target
+            (cp) => cp.target === props.vrList![<number>e.metaData].vr_id
           );
           if (targetIdx === -1) return;
           comitList[targetIdx].pitch = e.position.pitch;
@@ -174,13 +173,22 @@ onMounted(async () => {
       () => props.whichVr,
       function reloadMarker(newVr) {
         if (!newVr) return;
+        myPlugin.removeAllMarker();
         newVr.connect_position.forEach((position) => {
-          const targetIdx = newVr.connect_position.findIndex(
-            (hotPoint) => hotPoint.target === position.target
+          const targetIdx = props.vrList!.findIndex(
+            (vr) => vr.vr_id === position.target
           );
+          if (position.autoGen) {
+            const res = myPlugin.__computeMarkerPosition(
+              window.innerWidth / 2,
+              window.innerHeight / 2
+            );
+            position.yaw = res.yaw;
+            position.pitch = res.pitch;
+          }
           myPlugin.addMarker(
             `<a tabindex="0" class="flex flex-col items-center text-white cursor-pointer pointer-events-auto"><img class="w-8" src="/advance.svg"/><p>${
-              newVr.name || "未命名"
+              props.vrList![targetIdx].name || "未命名"
             }</p></a>`,
             { position, metaData: targetIdx }
           );

@@ -243,7 +243,7 @@ export class SelfMarkersPlugin extends AbstractPlugin<
       y + markerSize.height / 2 > this.viewer.state.size.height
     );
   }
-  private __computeMarkerPosition(x: number, y: number): Position {
+  __computeMarkerPosition(x: number, y: number): Position {
     const intersection = this.viewer.renderer
       .getIntersections({ x, y })
       .find((i) => i.object.userData["photoSphereViewer"]);
